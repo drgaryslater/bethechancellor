@@ -79,7 +79,7 @@ st.markdown(
     }
 
     .kpi-value {
-        font-size: 2.05rem;
+        font-size: 1.85rem;
         font-weight: 900;
         color: #0f172a;
         margin-bottom: 0.25rem;
@@ -140,7 +140,18 @@ st.markdown(
         line-height: 1.55;
     }
 
-    .risk-high {
+    .rule-pass {
+        background-color: #dcfce7;
+        color: #166534;
+        padding: 0.35rem 0.75rem;
+        border-radius: 999px;
+        font-weight: 800;
+        display: inline-block;
+        margin-right: 0.4rem;
+        margin-bottom: 0.3rem;
+    }
+
+    .rule-fail {
         background-color: #fee2e2;
         color: #991b1b;
         padding: 0.35rem 0.75rem;
@@ -151,20 +162,9 @@ st.markdown(
         margin-bottom: 0.3rem;
     }
 
-    .risk-medium {
+    .rule-warning {
         background-color: #fef3c7;
         color: #92400e;
-        padding: 0.35rem 0.75rem;
-        border-radius: 999px;
-        font-weight: 800;
-        display: inline-block;
-        margin-right: 0.4rem;
-        margin-bottom: 0.3rem;
-    }
-
-    .risk-low {
-        background-color: #dcfce7;
-        color: #166534;
         padding: 0.35rem 0.75rem;
         border-radius: 999px;
         font-weight: 800;
@@ -207,6 +207,8 @@ SCENARIOS = {
         "initial_employment": 75.0,
         "initial_exchange_rate": 100.0,
         "initial_output_gap": 0.0,
+        "initial_deficit": 4.0,
+        "initial_debt": 95.0,
         "demand_sensitivity": 1.0,
         "inflation_sensitivity": 1.0,
         "monetary_sensitivity": 1.0,
@@ -220,6 +222,8 @@ SCENARIOS = {
         "initial_employment": 73.5,
         "initial_exchange_rate": 98.0,
         "initial_output_gap": -1.8,
+        "initial_deficit": 5.8,
+        "initial_debt": 97.0,
         "demand_sensitivity": 1.25,
         "inflation_sensitivity": 0.75,
         "monetary_sensitivity": 0.85,
@@ -233,6 +237,8 @@ SCENARIOS = {
         "initial_employment": 74.7,
         "initial_exchange_rate": 99.0,
         "initial_output_gap": 0.3,
+        "initial_deficit": 4.5,
+        "initial_debt": 96.0,
         "demand_sensitivity": 0.9,
         "inflation_sensitivity": 1.45,
         "monetary_sensitivity": 1.35,
@@ -246,6 +252,8 @@ SCENARIOS = {
         "initial_employment": 74.8,
         "initial_exchange_rate": 97.5,
         "initial_output_gap": 0.2,
+        "initial_deficit": 4.8,
+        "initial_debt": 98.0,
         "demand_sensitivity": 0.85,
         "inflation_sensitivity": 1.25,
         "monetary_sensitivity": 1.1,
@@ -259,6 +267,8 @@ SCENARIOS = {
         "initial_employment": 74.5,
         "initial_exchange_rate": 94.0,
         "initial_output_gap": -0.3,
+        "initial_deficit": 6.0,
+        "initial_debt": 101.0,
         "demand_sensitivity": 0.8,
         "inflation_sensitivity": 1.2,
         "monetary_sensitivity": 1.25,
@@ -408,12 +418,10 @@ def classify_fiscal_stance(demand):
     return "Broadly neutral"
 
 
-def classify_risk(value, low_cutoff, high_cutoff):
-    if value >= high_cutoff:
-        return "High", "risk-high"
-    if value >= low_cutoff:
-        return "Medium", "risk-medium"
-    return "Low", "risk-low"
+def classify_rule_result(condition):
+    if condition:
+        return "Met", "rule-pass"
+    return "Breached", "rule-fail"
 
 
 def simulate_economy(settings, scenario_name, event_name, quarters=12):
@@ -427,7 +435,7 @@ def simulate_economy(settings, scenario_name, event_name, quarters=12):
 
     supply = supply_impulse(settings) + event["supply_shock"]
 
-    deficit = (
+    deficit_pressure = (
         deficit_impulse(settings)
         + event["deficit_shock"]
     )
@@ -437,6 +445,9 @@ def simulate_economy(settings, scenario_name, event_name, quarters=12):
     bank_rate = scenario["initial_bank_rate"] + event["rate_shock"]
     employment = scenario["initial_employment"]
     exchange_rate = scenario["initial_exchange_rate"] + event["fx_shock"]
+
+    debt_ratio = scenario["initial_debt"]
+    previous_debt_ratio = debt_ratio
 
     rows = []
 
@@ -461,7 +472,7 @@ def simulate_economy(settings, scenario_name, event_name, quarters=12):
             0.65 * inflation
             + 0.35 * 2.0
             + scenario["inflation_sensitivity"] * 0.28 * output_gap
-            + scenario["fiscal_risk_sensitivity"] * 0.05 * deficit
+            + scenario["fiscal_risk_sensitivity"] * 0.05 * deficit_pressure
             - 0.08 * supply_build
         )
 
@@ -479,7 +490,7 @@ def simulate_economy(settings, scenario_name, event_name, quarters=12):
             scenario["initial_exchange_rate"]
             + event["fx_shock"]
             + 1.7 * (bank_rate - scenario["initial_bank_rate"])
-            - scenario["fiscal_risk_sensitivity"] * 0.32 * deficit
+            - scenario["fiscal_risk_sensitivity"] * 0.32 * deficit_pressure
         )
 
         # Output growth and employment
@@ -491,8 +502,34 @@ def simulate_economy(settings, scenario_name, event_name, quarters=12):
             + 0.04 * supply_build
         )
 
+        # Stylised annual deficit as % of GDP
+        # Higher deficit pressure, weak growth and higher interest rates worsen the deficit.
+        # Stronger growth and supply improvements improve the fiscal position.
+        deficit_ratio = (
+            scenario["initial_deficit"]
+            + 0.32 * deficit_pressure
+            - 0.18 * (growth - scenario["initial_growth"])
+            + 0.10 * max(0, bank_rate - scenario["initial_bank_rate"])
+            - 0.08 * supply_build
+        )
+
+        deficit_ratio = max(deficit_ratio, -1.5)
+
+        # Stylised debt-GDP ratio
+        # Debt rises with deficits and interest-rate pressure, but falls with stronger nominal growth.
+        nominal_growth_proxy = growth + inflation
+        debt_change = (
+            0.18 * deficit_ratio
+            + 0.05 * max(0, bank_rate - scenario["initial_bank_rate"])
+            - 0.08 * nominal_growth_proxy
+        )
+
+        previous_debt_ratio = debt_ratio
+        debt_ratio = debt_ratio + debt_change
+
         rows.append({
             "Period": period,
+            "Year": year,
             "Quarter": t + 1,
             "GDP growth (%)": round(growth, 2),
             "Output gap (%)": round(output_gap, 2),
@@ -500,14 +537,44 @@ def simulate_economy(settings, scenario_name, event_name, quarters=12):
             "Bank Rate (%)": round(bank_rate, 2),
             "Employment rate (%)": round(employment, 2),
             "Exchange rate index": round(exchange_rate, 1),
-            "Deficit pressure": round(deficit, 2),
+            "Deficit pressure": round(deficit_pressure, 2),
+            "Annual deficit (% GDP)": round(deficit_ratio, 2),
+            "Debt-GDP ratio (%)": round(debt_ratio, 2),
+            "Quarterly debt change": round(debt_ratio - previous_debt_ratio, 2),
             "Supply capacity effect": round(supply_build, 2),
         })
 
     return pd.DataFrame(rows)
 
 
-def make_summary_table(df):
+def fiscal_rules(df):
+    final_year = df[df["Year"] == 3]
+
+    final_deficit = df["Annual deficit (% GDP)"].iloc[-1]
+    final_debt = df["Debt-GDP ratio (%)"].iloc[-1]
+
+    start_year3_debt = final_year["Debt-GDP ratio (%)"].iloc[0]
+    end_year3_debt = final_year["Debt-GDP ratio (%)"].iloc[-1]
+
+    deficit_rule_met = final_deficit <= 3.0
+    debt_rule_met = end_year3_debt < start_year3_debt
+    debt_warning = final_debt >= 100.0
+
+    overall_rules_met = deficit_rule_met and debt_rule_met and not debt_warning
+
+    return {
+        "final_deficit": final_deficit,
+        "final_debt": final_debt,
+        "start_year3_debt": start_year3_debt,
+        "end_year3_debt": end_year3_debt,
+        "deficit_rule_met": deficit_rule_met,
+        "debt_rule_met": debt_rule_met,
+        "debt_warning": debt_warning,
+        "overall_rules_met": overall_rules_met,
+    }
+
+
+def make_summary_table(df, rules):
     return pd.DataFrame({
         "Indicator": [
             "Peak GDP growth",
@@ -518,7 +585,11 @@ def make_summary_table(df):
             "Highest employment rate",
             "Lowest exchange-rate index",
             "End-period output gap",
-            "Deficit pressure"
+            "Final annual deficit",
+            "Final debt-GDP ratio",
+            "Debt falling in Year 3",
+            "Deficit rule",
+            "Debt rule"
         ],
         "Value": [
             f"{df['GDP growth (%)'].max():.2f}%",
@@ -529,12 +600,16 @@ def make_summary_table(df):
             f"{df['Employment rate (%)'].max():.2f}%",
             f"{df['Exchange rate index'].min():.1f}",
             f"{df['Output gap (%)'].iloc[-1]:.2f}%",
-            f"{df['Deficit pressure'].iloc[-1]:.2f}"
+            f"{rules['final_deficit']:.2f}% GDP",
+            f"{rules['final_debt']:.2f}% GDP",
+            "Yes" if rules["debt_rule_met"] else "No",
+            "Met" if rules["deficit_rule_met"] else "Breached",
+            "Met" if rules["debt_rule_met"] else "Breached"
         ]
     })
 
 
-def generate_briefing_text(df, settings, scenario_name, event_name):
+def generate_briefing_text(df, settings, scenario_name, event_name, rules):
     peak_growth = df["GDP growth (%)"].max()
     peak_inflation = df["Inflation (%)"].max()
     peak_rate = df["Bank Rate (%)"].max()
@@ -545,9 +620,12 @@ def generate_briefing_text(df, settings, scenario_name, event_name):
 
     demand = fiscal_demand_impulse(settings)
     supply = supply_impulse(settings)
-    deficit = deficit_impulse(settings)
+    deficit_pressure = deficit_impulse(settings)
 
     stance = classify_fiscal_stance(demand)
+
+    deficit_rule_text = "met" if rules["deficit_rule_met"] else "breached"
+    debt_rule_text = "met" if rules["debt_rule_met"] else "breached"
 
     briefing = f"""
 TREASURY BRIEFING PACK
@@ -564,22 +642,28 @@ The Budget is classified as {stance.lower()}. The simulation produces peak GDP g
 
 2. Transmission channels
 
-The fiscal demand impulse is {demand:.2f}. The supply capacity impulse is {supply:.2f}. Deficit pressure is {deficit:.2f}. Students should explain whether the main effect comes through aggregate demand, supply capacity, monetary policy, exchange-rate movements or fiscal credibility.
+The fiscal demand impulse is {demand:.2f}. The supply capacity impulse is {supply:.2f}. Deficit pressure is {deficit_pressure:.2f}. Students should explain whether the main effect comes through aggregate demand, supply capacity, monetary policy, exchange-rate movements or fiscal credibility.
 
 3. MPC response
 
 The simulated Bank Rate peaks at {peak_rate:.2f}%. If inflation moves above target and the output gap is positive, the model assumes that the Bank of England raises Bank Rate, partly offsetting the Chancellor's fiscal policy.
 
-4. Sterling and external risk
+4. Fiscal rules
+
+The final annual deficit is {rules["final_deficit"]:.2f}% of GDP. The final debt-GDP ratio is {rules["final_debt"]:.2f}% of GDP.
+
+The deficit rule is {deficit_rule_text}. The debt rule is {debt_rule_text}.
+
+5. Sterling and external risk
 
 The exchange-rate index falls as low as {min_fx:.1f}. In this teaching model, sterling is influenced by the interest-rate response and by fiscal credibility pressure.
 
-5. End-period position
+6. End-period position
 
 By the final quarter, the output gap is {final_output_gap:.2f}%. Students should consider whether the Budget delivers only a short-run demand boost or whether it also improves the economy's medium-run supply capacity.
 
 Student task:
-Prepare a 90-second Chancellor's statement explaining your objective, the main transmission mechanism, the Bank of England response and one unintended consequence.
+Prepare a 90-second Chancellor's statement explaining your objective, the main transmission mechanism, the Bank of England response, the fiscal rule position and one unintended consequence.
 """
 
     return briefing
@@ -596,7 +680,7 @@ st.markdown(
         <div class="treasury-title">Be the Chancellor</div>
         <div class="treasury-subtitle">
             Design a Budget, face economic events, and explain the consequences for growth,
-            inflation, employment, sterling and monetary policy.
+            inflation, employment, sterling, monetary policy and fiscal sustainability.
         </div>
     </div>
     """,
@@ -731,11 +815,12 @@ settings = {
 }
 
 df = simulate_economy(settings, scenario_name, event_name)
-summary = make_summary_table(df)
+rules = fiscal_rules(df)
+summary = make_summary_table(df, rules)
 
 demand = fiscal_demand_impulse(settings)
 supply = supply_impulse(settings)
-deficit = deficit_impulse(settings)
+deficit_pressure = deficit_impulse(settings)
 
 peak_growth = df["GDP growth (%)"].max()
 peak_inflation = df["Inflation (%)"].max()
@@ -744,11 +829,19 @@ final_inflation = df["Inflation (%)"].iloc[-1]
 final_growth = df["GDP growth (%)"].iloc[-1]
 final_employment = df["Employment rate (%)"].iloc[-1]
 min_exchange_rate = df["Exchange rate index"].min()
+final_deficit = rules["final_deficit"]
+final_debt = rules["final_debt"]
 
 fiscal_stance = classify_fiscal_stance(demand)
-inflation_risk_label, inflation_risk_class = classify_risk(peak_inflation, 2.7, 4.0)
-fiscal_risk_label, fiscal_risk_class = classify_risk(deficit, 0.75, 2.0)
-mpc_risk_label, mpc_risk_class = classify_risk(peak_rate, 4.75, 5.5)
+deficit_rule_label, deficit_rule_class = classify_rule_result(rules["deficit_rule_met"])
+debt_rule_label, debt_rule_class = classify_rule_result(rules["debt_rule_met"])
+
+if rules["debt_warning"]:
+    debt_warning_label = "Debt above 100% GDP"
+    debt_warning_class = "rule-warning"
+else:
+    debt_warning_label = "Debt below 100% GDP"
+    debt_warning_class = "rule-pass"
 
 
 # ------------------------------------------------------------
@@ -826,9 +919,9 @@ with k4:
     st.markdown(
         f"""
         <div class="dashboard-card">
-            <div class="kpi-label">Peak Bank Rate</div>
-            <div class="kpi-value">{peak_rate:.2f}%</div>
-            <div class="kpi-note">Taylor-style policy response</div>
+            <div class="kpi-label">Final deficit</div>
+            <div class="kpi-value">{final_deficit:.2f}%</div>
+            <div class="kpi-note">Annual deficit as % GDP</div>
         </div>
         """,
         unsafe_allow_html=True
@@ -838,9 +931,9 @@ with k5:
     st.markdown(
         f"""
         <div class="dashboard-card">
-            <div class="kpi-label">Final employment</div>
-            <div class="kpi-value">{final_employment:.2f}%</div>
-            <div class="kpi-note">Illustrative employment rate</div>
+            <div class="kpi-label">Final debt</div>
+            <div class="kpi-value">{final_debt:.2f}%</div>
+            <div class="kpi-note">Debt-GDP ratio</div>
         </div>
         """,
         unsafe_allow_html=True
@@ -855,7 +948,7 @@ tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     "Budget",
     "Macro paths",
     "Policy response",
-    "Risk assessment",
+    "Fiscal rules",
     "Summary data",
     "Briefing pack"
 ])
@@ -916,7 +1009,7 @@ with tab1:
     c1, c2, c3 = st.columns(3)
     c1.metric("Fiscal demand impulse", f"{demand:.2f}")
     c2.metric("Supply capacity impulse", f"{supply:.2f}")
-    c3.metric("Deficit pressure", f"{deficit:.2f}")
+    c3.metric("Deficit pressure", f"{deficit_pressure:.2f}")
 
     st.markdown(
         """
@@ -935,7 +1028,7 @@ with tab2:
     st.markdown(
         """
         These charts show simulated paths over the next **12 quarters**.
-        The purpose is to support policy reasoning, not to produce a literal forecast.
+        The public finance chart separates annual deficit and debt-GDP dynamics from the macro variables because they operate on different scales.
         """
     )
 
@@ -962,7 +1055,7 @@ with tab2:
 
     fig_macro.update_layout(
         template="plotly_white",
-        height=520,
+        height=500,
         xaxis_title="Period",
         yaxis_title="Percent",
         legend_title="Variable",
@@ -970,6 +1063,43 @@ with tab2:
     )
 
     st.plotly_chart(fig_macro, use_container_width=True)
+
+    st.subheader("Public finance outlook")
+
+    fiscal_long = df.melt(
+        id_vars=["Period", "Quarter"],
+        value_vars=[
+            "Annual deficit (% GDP)",
+            "Debt-GDP ratio (%)"
+        ],
+        var_name="Variable",
+        value_name="Value"
+    )
+
+    fig_fiscal = px.line(
+        fiscal_long,
+        x="Period",
+        y="Value",
+        color="Variable",
+        markers=True,
+        title="Annual deficit and debt-GDP ratio"
+    )
+
+    fig_fiscal.update_layout(
+        template="plotly_white",
+        height=500,
+        xaxis_title="Period",
+        yaxis_title="% of GDP",
+        legend_title="Variable",
+        hovermode="x unified"
+    )
+
+    st.plotly_chart(fig_fiscal, use_container_width=True)
+
+    st.caption(
+        "Fiscal modelling caveat: deficit and debt are stylised teaching indicators. "
+        "They are included to help students reason about fiscal trade-offs, not to provide a fiscal forecast."
+    )
 
 
 with tab3:
@@ -1016,39 +1146,40 @@ with tab3:
 
 
 with tab4:
-    st.header("Risk assessment")
+    st.header("Fiscal rules")
 
     st.markdown(
         f"""
         <div class="briefing-box">
-            <h3>Dashboard risk indicators</h3>
+            <h3>Fiscal rule indicators</h3>
             <p>
-                <span class="{inflation_risk_class}">{inflation_risk_label} inflation risk</span>
-                <span class="{mpc_risk_class}">{mpc_risk_label} MPC tightening risk</span>
-                <span class="{fiscal_risk_class}">{fiscal_risk_label} fiscal risk</span>
+                <span class="{deficit_rule_class}">Deficit rule: {deficit_rule_label}</span>
+                <span class="{debt_rule_class}">Debt rule: {debt_rule_label}</span>
+                <span class="{debt_warning_class}">{debt_warning_label}</span>
             </p>
             <p>
-                Peak inflation is <strong>{peak_inflation:.2f}%</strong>, peak Bank Rate is
-                <strong>{peak_rate:.2f}%</strong>, and deficit pressure is
-                <strong>{deficit:.2f}</strong>.
-            </p>
-        </div>
-
-        <div class="briefing-box">
-            <h3>Main policy trade-off</h3>
-            <p>
-                The Chancellor must trade off short-run growth, inflation control, employment,
-                fiscal credibility and sterling stability. A package that raises demand strongly may
-                increase output and employment initially, but it may also raise inflation and trigger
-                a Bank of England response.
+                <strong>Deficit rule:</strong> final annual deficit must be below 3% of GDP.<br>
+                <strong>Debt rule:</strong> debt-GDP ratio must be falling by Year 3.<br>
+                <strong>Sustainability warning:</strong> debt-GDP ratio above 100% triggers a warning.
             </p>
         </div>
 
         <div class="briefing-box">
-            <h3>External vulnerability</h3>
+            <h3>Current fiscal position</h3>
             <p>
-                The lowest simulated exchange-rate index is <strong>{min_exchange_rate:.1f}</strong>.
-                In this model, sterling is weakened by fiscal pressure and supported by higher interest rates.
+                Final annual deficit: <strong>{rules["final_deficit"]:.2f}% of GDP</strong><br>
+                Final debt-GDP ratio: <strong>{rules["final_debt"]:.2f}% of GDP</strong><br>
+                Start of Year 3 debt-GDP ratio: <strong>{rules["start_year3_debt"]:.2f}% of GDP</strong><br>
+                End of Year 3 debt-GDP ratio: <strong>{rules["end_year3_debt"]:.2f}% of GDP</strong>
+            </p>
+        </div>
+
+        <div class="briefing-box">
+            <h3>Teaching interpretation</h3>
+            <p>
+                A Budget can raise growth and employment while still breaching fiscal rules.
+                This creates a realistic policy trade-off: the Chancellor must explain whether
+                short-run macroeconomic gains justify higher deficit and debt risks.
             </p>
         </div>
         """,
@@ -1069,7 +1200,7 @@ with tab5:
 with tab6:
     st.header("Treasury briefing pack")
 
-    briefing_text = generate_briefing_text(df, settings, scenario_name, event_name)
+    briefing_text = generate_briefing_text(df, settings, scenario_name, event_name, rules)
 
     st.markdown(
         f"""
@@ -1089,7 +1220,7 @@ with tab6:
             <p>
             The fiscal demand impulse is <strong>{demand:.2f}</strong>.
             The supply capacity impulse is <strong>{supply:.2f}</strong>.
-            Deficit pressure is <strong>{deficit:.2f}</strong>.
+            Deficit pressure is <strong>{deficit_pressure:.2f}</strong>.
             Students should explain whether the dominant channel is aggregate demand,
             supply capacity, monetary policy, exchange-rate pressure or fiscal credibility.
             </p>
@@ -1105,7 +1236,17 @@ with tab6:
         </div>
 
         <div class="briefing-box">
-            <h3>4. Event assessment</h3>
+            <h3>4. Fiscal rule assessment</h3>
+            <p>
+            Final annual deficit is <strong>{rules["final_deficit"]:.2f}% of GDP</strong>.
+            Final debt-GDP ratio is <strong>{rules["final_debt"]:.2f}% of GDP</strong>.
+            The deficit rule is <strong>{deficit_rule_label.lower()}</strong>.
+            The debt rule is <strong>{debt_rule_label.lower()}</strong>.
+            </p>
+        </div>
+
+        <div class="briefing-box">
+            <h3>5. Event assessment</h3>
             <p>
             <strong>{event_name}</strong>: {EVENTS[event_name]["description"]}
             Students should explain how this event changes the policy trade-off facing the Chancellor.
@@ -1113,11 +1254,11 @@ with tab6:
         </div>
 
         <div class="briefing-box">
-            <h3>5. Chancellor's speaking note</h3>
+            <h3>6. Chancellor's speaking note</h3>
             <p>
             Prepare a 90-second statement explaining your Budget. You should defend your policy objective,
-            identify the main transmission mechanism, explain the Bank of England response and acknowledge
-            one unintended consequence.
+            identify the main transmission mechanism, explain the Bank of England response, assess the fiscal
+            rules and acknowledge one unintended consequence.
             </p>
         </div>
         """,
@@ -1137,5 +1278,6 @@ st.divider()
 st.caption(
     "Teaching caveat: This is a stylised LUBS2281 policy simulator. "
     "It uses simplified behavioural equations inspired by open-economy New Keynesian models. "
+    "The deficit and debt paths are teaching indicators, not fiscal forecasts. "
     "It is not an official forecast, OBR model or Bank of England model."
 )
