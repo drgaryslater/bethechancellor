@@ -8,8 +8,9 @@ import plotly.graph_objects as go
 # BE THE CHANCELLOR
 # LUBS2281 fiscal policy simulation game
 #
-# A simplified open-economy New Keynesian teaching simulator.
-# This is not an official forecast, OBR model or Bank of England model.
+# Calibrated teaching version using UK quarterly data, 1997 Q1-2026 Q2.
+# This is a simplified open-economy New Keynesian teaching simulator.
+# It is not an official forecast, OBR model or Bank of England model.
 # ============================================================
 
 st.set_page_config(
@@ -17,6 +18,50 @@ st.set_page_config(
     page_icon="🏛️",
     layout="wide"
 )
+
+# ------------------------------------------------------------
+# Calibration block
+# ------------------------------------------------------------
+# First-pass calibration from UK quarterly data uploaded by user.
+# Dynamics are calibrated from reduced-form regressions.
+# Fiscal slider multipliers remain teaching assumptions.
+
+CAL = {
+    # Latest complete UK baseline, 2026 Q1
+    "baseline_growth": 0.9,
+    "baseline_qoq_growth": 0.6,
+    "baseline_inflation": 3.3,
+    "baseline_employment": 75.0,
+    "baseline_unemployment": 5.0,
+    "baseline_bank_rate": 3.75,
+    "baseline_exchange_rate": 84.8,
+    "baseline_deficit": 4.3,
+    "baseline_debt": 93.7,
+
+    # Macro dynamics
+    "output_gap_persistence": 0.55,
+    "inflation_persistence": 0.85,
+    "phillips_output_gap": 0.06,
+    "exchange_rate_pass_through": 0.04,
+
+    # Monetary policy reaction
+    "taylor_smoothing": 0.90,
+    "taylor_inflation_response": 1.70,
+    "taylor_output_gap_response": 0.10,
+
+    # Labour market
+    "employment_output_gap_effect": 0.05,
+
+    # Fiscal dynamics
+    "deficit_persistence": 0.85,
+    "deficit_growth_effect": -0.20,
+    "deficit_rate_effect": 0.02,
+
+    # Debt dynamics
+    "debt_deficit_effect": 0.09,
+    "debt_growth_effect": -0.15,
+    "debt_rate_effect": 0.02,
+}
 
 # ------------------------------------------------------------
 # Custom dashboard styling
@@ -80,7 +125,7 @@ st.markdown(
     }
 
     .kpi-value {
-        font-size: 1.85rem;
+        font-size: 1.75rem;
         font-weight: 900;
         color: #0f172a;
         margin-bottom: 0.25rem;
@@ -183,9 +228,8 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-
 # ------------------------------------------------------------
-# Baseline settings
+# Baseline policy settings
 # ------------------------------------------------------------
 
 BASE = {
@@ -200,61 +244,65 @@ BASE = {
     "infrastructure": 100.0,
 }
 
+# ------------------------------------------------------------
+# Macroeconomic scenarios
+# ------------------------------------------------------------
+
 SCENARIOS = {
-    "Normal conditions": {
-        "initial_growth": 1.4,
-        "initial_inflation": 2.0,
-        "initial_bank_rate": 4.5,
-        "initial_employment": 75.0,
-        "initial_exchange_rate": 100.0,
+    "Current UK baseline": {
+        "initial_growth": CAL["baseline_growth"],
+        "initial_inflation": CAL["baseline_inflation"],
+        "initial_bank_rate": CAL["baseline_bank_rate"],
+        "initial_employment": CAL["baseline_employment"],
+        "initial_exchange_rate": CAL["baseline_exchange_rate"],
         "initial_output_gap": 0.0,
-        "initial_deficit": 4.0,
-        "initial_debt": 95.0,
+        "initial_deficit": CAL["baseline_deficit"],
+        "initial_debt": CAL["baseline_debt"],
         "demand_sensitivity": 1.0,
         "inflation_sensitivity": 1.0,
         "monetary_sensitivity": 1.0,
         "fiscal_risk_sensitivity": 1.0,
-        "description": "The economy begins close to potential. Inflation is at target and policy is broadly neutral."
+        "description": "Latest calibrated UK baseline using the latest complete observation in the uploaded dataset."
     },
     "Recession": {
-        "initial_growth": -0.4,
-        "initial_inflation": 1.4,
-        "initial_bank_rate": 3.5,
+        "initial_growth": -1.0,
+        "initial_inflation": 1.8,
+        "initial_bank_rate": 2.5,
         "initial_employment": 73.5,
-        "initial_exchange_rate": 98.0,
-        "initial_output_gap": -1.8,
-        "initial_deficit": 5.8,
-        "initial_debt": 97.0,
+        "initial_exchange_rate": 82.0,
+        "initial_output_gap": -2.0,
+        "initial_deficit": 6.5,
+        "initial_debt": 96.0,
         "demand_sensitivity": 1.25,
         "inflation_sensitivity": 0.75,
         "monetary_sensitivity": 0.85,
-        "fiscal_risk_sensitivity": 0.8,
+        "fiscal_risk_sensitivity": 0.9,
         "description": "Weak demand and spare capacity mean fiscal expansion has a larger output effect and less immediate inflation pressure."
     },
     "High inflation": {
-        "initial_growth": 0.8,
-        "initial_inflation": 5.5,
-        "initial_bank_rate": 5.25,
-        "initial_employment": 74.7,
-        "initial_exchange_rate": 99.0,
+        "initial_growth": 1.1,
+        "initial_inflation": 5.0,
+        "initial_bank_rate": 4.5,
+        "initial_employment": 75.0,
+        "initial_exchange_rate": 81.0,
         "initial_output_gap": 0.3,
-        "initial_deficit": 4.5,
-        "initial_debt": 96.0,
+        "initial_deficit": 5.3,
+        "initial_debt": 94.0,
         "demand_sensitivity": 0.9,
-        "inflation_sensitivity": 1.45,
-        "monetary_sensitivity": 1.35,
+        "inflation_sensitivity": 1.35,
+        "monetary_sensitivity": 1.25,
         "fiscal_risk_sensitivity": 1.2,
         "description": "Inflation starts above target. Fiscal loosening risks provoking a stronger monetary policy response."
     },
     "Weak productivity": {
-        "initial_growth": 0.6,
-        "initial_inflation": 3.0,
-        "initial_bank_rate": 4.75,
-        "initial_employment": 74.8,
-        "initial_exchange_rate": 97.5,
+        "initial_growth": 1.1,
+        "initial_inflation": 2.5,
+        "initial_bank_rate": 2.5,
+        "initial_employment": 74.3,
+        "initial_exchange_rate": 83.0,
         "initial_output_gap": 0.2,
-        "initial_deficit": 4.8,
-        "initial_debt": 98.0,
+        "initial_deficit": 5.3,
+        "initial_debt": 94.0,
         "demand_sensitivity": 0.85,
         "inflation_sensitivity": 1.25,
         "monetary_sensitivity": 1.1,
@@ -262,14 +310,14 @@ SCENARIOS = {
         "description": "Low supply growth means demand stimulus quickly meets capacity constraints unless policy improves potential output."
     },
     "Fiscal credibility pressure": {
-        "initial_growth": 0.9,
-        "initial_inflation": 3.4,
-        "initial_bank_rate": 5.0,
-        "initial_employment": 74.5,
-        "initial_exchange_rate": 94.0,
+        "initial_growth": 1.2,
+        "initial_inflation": 4.1,
+        "initial_bank_rate": 4.1,
+        "initial_employment": 75.1,
+        "initial_exchange_rate": 81.8,
         "initial_output_gap": -0.3,
-        "initial_deficit": 6.0,
-        "initial_debt": 101.0,
+        "initial_deficit": 5.6,
+        "initial_debt": 98.0,
         "demand_sensitivity": 0.8,
         "inflation_sensitivity": 1.2,
         "monetary_sensitivity": 1.25,
@@ -277,6 +325,10 @@ SCENARIOS = {
         "description": "Markets are sensitive to unfunded fiscal loosening. Larger deficits weaken sterling and add to inflation pressure."
     },
 }
+
+# ------------------------------------------------------------
+# Events
+# ------------------------------------------------------------
 
 EVENTS = {
     "No additional event": {
@@ -344,12 +396,16 @@ EVENTS = {
     }
 }
 
-
 # ------------------------------------------------------------
-# Model functions
+# Fiscal policy impulse functions
 # ------------------------------------------------------------
 
 def fiscal_demand_impulse(settings):
+    """
+    Positive values raise short-run aggregate demand.
+    These slider weights remain teaching assumptions.
+    """
+
     tax_drag = (
         0.035 * (settings["basic_income_tax"] - BASE["basic_income_tax"])
         + 0.018 * (settings["higher_income_tax"] - BASE["higher_income_tax"])
@@ -369,6 +425,11 @@ def fiscal_demand_impulse(settings):
 
 
 def supply_impulse(settings):
+    """
+    Positive values gradually increase supply capacity.
+    These slider weights remain teaching assumptions.
+    """
+
     return (
         0.004 * (settings["education"] - BASE["education"])
         + 0.003 * (settings["health"] - BASE["health"])
@@ -378,6 +439,11 @@ def supply_impulse(settings):
 
 
 def deficit_impulse(settings):
+    """
+    Internal indicator of direct fiscal pressure before growth, rate and debt feedbacks.
+    This should be interpreted as an underlying fiscal balance effect.
+    """
+
     revenue_gain = (
         0.18 * (settings["basic_income_tax"] - BASE["basic_income_tax"])
         + 0.08 * (settings["higher_income_tax"] - BASE["higher_income_tax"])
@@ -410,6 +476,10 @@ def classify_rule_result(condition):
     return "Breached", "rule-fail"
 
 
+# ------------------------------------------------------------
+# Calibrated simulation engine
+# ------------------------------------------------------------
+
 def simulate_economy(settings, scenario_name, event_name, quarters=12):
     scenario = SCENARIOS[scenario_name]
     event = EVENTS[event_name]
@@ -432,6 +502,7 @@ def simulate_economy(settings, scenario_name, event_name, quarters=12):
     employment = scenario["initial_employment"]
     exchange_rate = scenario["initial_exchange_rate"] + event["fx_shock"]
 
+    deficit_ratio = scenario["initial_deficit"]
     debt_ratio = scenario["initial_debt"]
     previous_debt_ratio = debt_ratio
 
@@ -445,60 +516,80 @@ def simulate_economy(settings, scenario_name, event_name, quarters=12):
         demand_decay = 0.78 ** t
         supply_build = supply * (1 - 0.80 ** (t + 1))
 
+        # Calibrated reduced-form output-gap dynamics
         output_gap = (
-            0.72 * output_gap
+            CAL["output_gap_persistence"] * output_gap
             + demand * demand_decay
             + 0.35 * supply_build
             - 0.10 * (bank_rate - scenario["initial_bank_rate"])
         )
 
-        inflation = (
-            0.65 * inflation
-            + 0.35 * 2.0
-            + scenario["inflation_sensitivity"] * 0.28 * output_gap
-            + scenario["fiscal_risk_sensitivity"] * 0.05 * deficit_pressure
-            - 0.08 * supply_build
-        )
+        # Annual GDP growth displayed in the app
+        growth = scenario["initial_growth"] + output_gap + 0.25 * supply_build
 
-        desired_rate = (
-            4.0
-            + scenario["monetary_sensitivity"] * 1.35 * (inflation - 2.0)
-            + 0.35 * output_gap
-        )
-
-        bank_rate = 0.72 * bank_rate + 0.28 * desired_rate
-
+        # Exchange-rate channel
         exchange_rate = (
             scenario["initial_exchange_rate"]
             + event["fx_shock"]
-            + 1.7 * (bank_rate - scenario["initial_bank_rate"])
-            - scenario["fiscal_risk_sensitivity"] * 0.32 * deficit_pressure
+            + 1.2 * (bank_rate - scenario["initial_bank_rate"])
+            - scenario["fiscal_risk_sensitivity"] * 0.25 * deficit_pressure
         )
 
-        growth = scenario["initial_growth"] + output_gap + 0.25 * supply_build
+        sterling_depreciation_pressure = max(
+            0,
+            scenario["initial_exchange_rate"] - exchange_rate
+        )
 
+        # Calibrated Phillips-curve style inflation equation
+        inflation = (
+            CAL["inflation_persistence"] * inflation
+            + (1 - CAL["inflation_persistence"]) * 2.0
+            + scenario["inflation_sensitivity"] * CAL["phillips_output_gap"] * output_gap
+            + CAL["exchange_rate_pass_through"] * sterling_depreciation_pressure
+            + 0.03 * scenario["fiscal_risk_sensitivity"] * deficit_pressure
+            - 0.05 * supply_build
+        )
+
+        # Calibrated Taylor-style monetary policy rule
+        neutral_rate = scenario["initial_bank_rate"]
+
+        desired_rate = (
+            neutral_rate
+            + scenario["monetary_sensitivity"] * CAL["taylor_inflation_response"] * (inflation - 2.0)
+            + CAL["taylor_output_gap_response"] * output_gap
+        )
+
+        bank_rate = (
+            CAL["taylor_smoothing"] * bank_rate
+            + (1 - CAL["taylor_smoothing"]) * desired_rate
+        )
+
+        bank_rate = max(0.0, bank_rate)
+
+        # Labour market response
         employment = (
             scenario["initial_employment"]
-            + 0.22 * output_gap
+            + CAL["employment_output_gap_effect"] * output_gap
             + 0.04 * supply_build
         )
 
+        # Calibrated deficit dynamics
+        direct_deficit_effect = scenario["initial_deficit"] + 0.25 * deficit_pressure
+
         deficit_ratio = (
-            scenario["initial_deficit"]
-            + 0.32 * deficit_pressure
-            - 0.18 * (growth - scenario["initial_growth"])
-            + 0.10 * max(0, bank_rate - scenario["initial_bank_rate"])
-            - 0.08 * supply_build
+            CAL["deficit_persistence"] * deficit_ratio
+            + (1 - CAL["deficit_persistence"]) * direct_deficit_effect
+            + CAL["deficit_growth_effect"] * (growth - scenario["initial_growth"])
+            + CAL["deficit_rate_effect"] * max(0, bank_rate - scenario["initial_bank_rate"])
         )
 
         deficit_ratio = max(deficit_ratio, -1.5)
 
-        nominal_growth_proxy = growth + inflation
-
+        # Calibrated debt-GDP dynamics
         debt_change = (
-            0.18 * deficit_ratio
-            + 0.05 * max(0, bank_rate - scenario["initial_bank_rate"])
-            - 0.08 * nominal_growth_proxy
+            CAL["debt_deficit_effect"] * deficit_ratio
+            + CAL["debt_growth_effect"] * growth
+            + CAL["debt_rate_effect"] * max(0, bank_rate - scenario["initial_bank_rate"])
         )
 
         previous_debt_ratio = debt_ratio
@@ -514,7 +605,7 @@ def simulate_economy(settings, scenario_name, event_name, quarters=12):
             "Bank Rate (%)": round(bank_rate, 2),
             "Employment rate (%)": round(employment, 2),
             "Exchange rate index": round(exchange_rate, 1),
-            "Deficit pressure": round(deficit_pressure, 2),
+            "Underlying fiscal balance effect": round(deficit_pressure, 2),
             "Annual deficit (% GDP)": round(deficit_ratio, 2),
             "Debt-GDP ratio (%)": round(debt_ratio, 2),
             "Quarterly debt change": round(debt_ratio - previous_debt_ratio, 2),
@@ -597,7 +688,7 @@ def generate_briefing_text(df, settings, scenario_name, event_name, rules):
 
     demand = fiscal_demand_impulse(settings)
     supply = supply_impulse(settings)
-    deficit_pressure = deficit_impulse(settings)
+    fiscal_balance_effect = deficit_impulse(settings)
 
     stance = classify_fiscal_stance(demand)
 
@@ -619,7 +710,7 @@ The Budget is classified as {stance.lower()}. The simulation produces peak GDP g
 
 2. Transmission channels
 
-The fiscal demand impulse is {demand:.2f}. The supply capacity impulse is {supply:.2f}. Deficit pressure is {deficit_pressure:.2f}. Students should explain whether the main effect comes through aggregate demand, supply capacity, monetary policy, exchange-rate movements or fiscal credibility.
+The fiscal demand impulse is {demand:.2f}. The supply capacity impulse is {supply:.2f}. The underlying fiscal balance effect is {fiscal_balance_effect:.2f}. Students should explain whether the main effect comes through aggregate demand, supply capacity, monetary policy, exchange-rate movements or fiscal credibility.
 
 3. MPC response
 
@@ -633,7 +724,7 @@ The deficit rule is {deficit_rule_text}. The debt rule is {debt_rule_text}.
 
 5. Sterling and external risk
 
-The exchange-rate index falls as low as {min_fx:.1f}. In this teaching model, sterling is influenced by the interest-rate response and by fiscal credibility pressure.
+The exchange-rate index falls as low as {min_fx:.1f}. In this teaching model, sterling is influenced by the interest-rate response and fiscal credibility pressure.
 
 6. End-period position
 
@@ -666,12 +757,11 @@ st.markdown(
 
 st.markdown(
     """
-    This app is a **simplified teaching simulator inspired by open-economy New Keynesian policy models**.
+    This app is a **simplified teaching simulator calibrated using UK quarterly macroeconomic data**.
     It is designed to support economic reasoning and classroom debate. It is **not** an official forecast,
     OBR model or Bank of England model.
     """
 )
-
 
 # ------------------------------------------------------------
 # Sidebar
@@ -778,7 +868,6 @@ with st.sidebar:
         step=1.0
     )
 
-
 settings = {
     "basic_income_tax": basic_income_tax,
     "higher_income_tax": higher_income_tax,
@@ -797,7 +886,7 @@ summary = make_summary_table(df, rules)
 
 demand = fiscal_demand_impulse(settings)
 supply = supply_impulse(settings)
-deficit_pressure = deficit_impulse(settings)
+fiscal_balance_effect = deficit_impulse(settings)
 
 peak_growth = df["GDP growth (%)"].max()
 peak_inflation = df["Inflation (%)"].max()
@@ -819,7 +908,6 @@ if rules["debt_warning"]:
 else:
     debt_warning_label = "Debt below 100% GDP"
     debt_warning_class = "rule-pass"
-
 
 # ------------------------------------------------------------
 # Scenario and event panels
@@ -848,7 +936,6 @@ with right_panel:
         """,
         unsafe_allow_html=True
     )
-
 
 # ------------------------------------------------------------
 # KPI cards
@@ -916,7 +1003,6 @@ with k5:
         unsafe_allow_html=True
     )
 
-
 # ------------------------------------------------------------
 # Tabs
 # ------------------------------------------------------------
@@ -929,7 +1015,6 @@ tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     "Summary data",
     "Briefing pack"
 ])
-
 
 with tab1:
     st.header("Your Budget package")
@@ -986,7 +1071,7 @@ with tab1:
     c1, c2, c3 = st.columns(3)
     c1.metric("Fiscal demand impulse", f"{demand:.2f}")
     c2.metric("Supply capacity impulse", f"{supply:.2f}")
-    c3.metric("Deficit pressure", f"{deficit_pressure:.2f}")
+    c3.metric("Underlying fiscal balance effect", f"{fiscal_balance_effect:.2f}")
 
     st.markdown(
         """
@@ -994,10 +1079,9 @@ with tab1:
 
         - A positive **fiscal demand impulse** means the Budget raises short-run aggregate demand.
         - A positive **supply capacity impulse** means the Budget gradually raises potential output.
-        - A positive **deficit pressure** value means the package increases pressure on borrowing.
+        - A positive **underlying fiscal balance effect** means the package increases pressure on borrowing before growth and interest-rate feedbacks.
         """
     )
-
 
 with tab2:
     st.header("Forward macroeconomic paths")
@@ -1009,10 +1093,6 @@ with tab2:
         inflation, employment, deficit and debt are easier to interpret.
         """
     )
-
-    # --------------------------------------------------------
-    # Chart 1: Growth and output gap
-    # --------------------------------------------------------
 
     real_activity_long = df.melt(
         id_vars=["Period", "Quarter"],
@@ -1051,10 +1131,6 @@ with tab2:
     )
 
     st.plotly_chart(fig_activity, use_container_width=True)
-
-    # --------------------------------------------------------
-    # Chart 2: Inflation and employment on two axes
-    # --------------------------------------------------------
 
     fig_inflation_employment = go.Figure()
 
@@ -1111,10 +1187,6 @@ with tab2:
     )
 
     st.plotly_chart(fig_inflation_employment, use_container_width=True)
-
-    # --------------------------------------------------------
-    # Chart 3: Public finances on two axes
-    # --------------------------------------------------------
 
     fig_fiscal = go.Figure()
 
@@ -1178,7 +1250,6 @@ with tab2:
         "much larger than the annual deficit. These are stylised teaching indicators rather than official forecasts."
     )
 
-
 with tab3:
     st.header("Bank of England and exchange-rate response")
 
@@ -1216,11 +1287,10 @@ with tab3:
         """
         ### Teaching interpretation
 
-        The model uses a Taylor-style reaction function. If inflation rises above target and the output gap is positive,
+        The calibrated model uses a Taylor-style reaction function. If inflation rises above target and the output gap is positive,
         Bank Rate increases. The exchange rate responds to interest-rate movements and fiscal credibility pressure.
         """
     )
-
 
 with tab4:
     st.header("Fiscal rules")
@@ -1263,7 +1333,6 @@ with tab4:
         unsafe_allow_html=True
     )
 
-
 with tab5:
     st.header("Simulation summary")
 
@@ -1272,7 +1341,6 @@ with tab5:
     st.markdown("### Full quarterly data")
 
     st.dataframe(df, use_container_width=True, hide_index=True)
-
 
 with tab6:
     st.header("Treasury briefing pack")
@@ -1297,7 +1365,7 @@ with tab6:
             <p>
             The fiscal demand impulse is <strong>{demand:.2f}</strong>.
             The supply capacity impulse is <strong>{supply:.2f}</strong>.
-            Deficit pressure is <strong>{deficit_pressure:.2f}</strong>.
+            The underlying fiscal balance effect is <strong>{fiscal_balance_effect:.2f}</strong>.
             Students should explain whether the dominant channel is aggregate demand,
             supply capacity, monetary policy, exchange-rate pressure or fiscal credibility.
             </p>
@@ -1349,12 +1417,13 @@ with tab6:
         mime="text/plain"
     )
 
-
 st.divider()
 
 st.caption(
     "Teaching caveat: This is a stylised LUBS2281 policy simulator. "
-    "It uses simplified behavioural equations inspired by open-economy New Keynesian models. "
+    "It uses simplified behavioural equations calibrated using UK quarterly data where possible. "
+    "The tax and spending slider effects remain teaching assumptions because causal fiscal multipliers "
+    "require stronger identification than simple time-series correlations. "
     "The deficit and debt paths are teaching indicators, not fiscal forecasts. "
     "It is not an official forecast, OBR model or Bank of England model."
 )
