@@ -1253,42 +1253,100 @@ with tab2:
 with tab3:
     st.header("Bank of England and exchange-rate response")
 
-    policy_long = df.melt(
-        id_vars=["Period", "Quarter"],
-        value_vars=[
-            "Bank Rate (%)",
-            "Exchange rate index"
-        ],
-        var_name="Variable",
-        value_name="Value"
+    st.markdown(
+        """
+        This chart separates **Bank Rate** and the **exchange-rate index** onto two axes.
+        Bank Rate is shown on the left axis, while the exchange-rate index is shown on the right axis.
+        This makes the monetary policy response easier to see.
+        """
     )
 
-    fig_policy = px.line(
-        policy_long,
-        x="Period",
-        y="Value",
-        color="Variable",
-        markers=True,
-        title="Policy rate and exchange-rate response"
+    initial_bank_rate = SCENARIOS[scenario_name]["initial_bank_rate"]
+    initial_exchange_rate = SCENARIOS[scenario_name]["initial_exchange_rate"]
+
+    fig_policy = go.Figure()
+
+    fig_policy.add_trace(
+        go.Scatter(
+            x=df["Period"],
+            y=df["Bank Rate (%)"],
+            name="Bank Rate (%)",
+            mode="lines+markers",
+            line=dict(
+                width=3,
+                color="#dc2626"
+            )
+        )
+    )
+
+    fig_policy.add_trace(
+        go.Scatter(
+            x=df["Period"],
+            y=df["Exchange rate index"],
+            name="Exchange rate index",
+            mode="lines+markers",
+            line=dict(
+                width=3,
+                color="#2563eb"
+            ),
+            yaxis="y2"
+        )
     )
 
     fig_policy.update_layout(
+        title="Monetary policy and sterling",
         template="plotly_white",
-        height=520,
-        xaxis_title="Period",
-        yaxis_title="Percent / index",
-        legend_title="Variable",
-        hovermode="x unified"
+        height=500,
+
+        xaxis=dict(
+            title="Period"
+        ),
+
+        yaxis=dict(
+            title="Bank Rate (%)",
+            color="#dc2626"
+        ),
+
+        yaxis2=dict(
+            title="Exchange Rate Index",
+            color="#2563eb",
+            overlaying="y",
+            side="right"
+        ),
+
+        hovermode="x unified",
+
+        legend=dict(
+            orientation="h",
+            y=1.12,
+            x=0
+        )
+    )
+
+    fig_policy.add_hline(
+        y=initial_bank_rate,
+        line_dash="dash",
+        line_color="#991b1b",
+        annotation_text=f"Initial Bank Rate: {initial_bank_rate:.2f}%",
+        annotation_position="top left"
     )
 
     st.plotly_chart(fig_policy, use_container_width=True)
 
     st.markdown(
-        """
+        f"""
         ### Teaching interpretation
 
-        The calibrated model uses a Taylor-style reaction function. If inflation rises above target and the output gap is positive,
-        Bank Rate increases. The exchange rate responds to interest-rate movements and fiscal credibility pressure.
+        The model uses a calibrated Taylor-style reaction function. If inflation rises above target
+        and the output gap is positive, Bank Rate tends to increase.
+
+        In this scenario, the initial Bank Rate is **{initial_bank_rate:.2f}%**.
+        The dashed red line marks that starting point, so students can see whether monetary policy
+        tightens or loosens after the Budget and event shock.
+
+        Sterling is plotted on the right-hand axis because the exchange-rate index is on a very
+        different scale from Bank Rate. In this version, sterling responds to interest-rate movements
+        and fiscal credibility pressure.
         """
     )
 
